@@ -1,0 +1,8 @@
+prefix=/Bandit_in_person_tutorial/bandit_nlp/install
+
+Name: nlp
+Description: Description of nlp
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

@@ -1,0 +1,2 @@
+nlp
+-DCATKIN_DEVEL_PREFIX=/Bandit_in_person_tutorial/bandit_nlp/devel -DCMAKE_INSTALL_PREFIX=/Bandit_in_person_tutorial/bandit_nlp/install -G Unix Makefiles

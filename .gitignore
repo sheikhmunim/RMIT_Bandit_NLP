@@ -1,2 +1,57 @@
 tutorial/build
 tutorial/devel
+
+
+# ROS build artifacts
+build/
+devel/
+log/
+install/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+*.log
+
+# Model checkpoints and large artifacts
+*.safetensors
+*.bin
+*.pth
+*.pt
+
+# Huggingface and datasets cache
+~/.cache/huggingface/
+~/.huggingface/
+~/.cache/datasets/
+
+# Jupyter and notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# VSCode / Devcontainers
+.vscode/
+.devcontainer/
+*.code-workspace
+
+# Virtual environments
+venv/
+env/
+*.env
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Dataset files (optional)
+commands.csv
+*.csv
+*.tsv
+
+# Python packages installed via pip
+*.whl
+dist/
+pip-wheel-metadata/

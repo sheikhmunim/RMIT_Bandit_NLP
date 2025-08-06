@@ -9,6 +9,7 @@
 # modified environment variables
 export CMAKE_PREFIX_PATH="/Bandit_in_person_tutorial/bandit_nlp/devel:$CMAKE_PREFIX_PATH"
 export LD_LIBRARY_PATH="/Bandit_in_person_tutorial/bandit_nlp/devel/lib:$LD_LIBRARY_PATH"
+export PKG_CONFIG_PATH="/Bandit_in_person_tutorial/bandit_nlp/devel/lib/pkgconfig:$PKG_CONFIG_PATH"
 export PWD='/Bandit_in_person_tutorial/bandit_nlp/build'
 export ROSLISP_PACKAGE_DIRECTORIES='/Bandit_in_person_tutorial/bandit_nlp/devel/share/common-lisp'
 export ROS_PACKAGE_PATH="/Bandit_in_person_tutorial/bandit_nlp/src:$ROS_PACKAGE_PATH"

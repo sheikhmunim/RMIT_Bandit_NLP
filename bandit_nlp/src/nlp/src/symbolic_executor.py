@@ -8,7 +8,7 @@ cmd_pub = None
 
 def init_executor():
     global cmd_pub
-    cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+    cmd_pub = rospy.Publisher('/mobile_base_controller/cmd_vel', Twist, queue_size=1)
 
 def execute_symbolic(labels):
     global cmd_pub
@@ -16,18 +16,19 @@ def execute_symbolic(labels):
 
     if 'STOP' in labels:
         rospy.loginfo("→ Executing STOP")
-        twist.linear.x = 0.0
-        cmd_pub.publish(twist)
+        # twist.linear.x = 0.0
+        # cmd_pub.publish(twist)
 
     if 'GO_SLOW' in labels:
         rospy.loginfo("→ Moving slow")
-        twist.linear.x = 0.1
-        cmd_pub.publish(twist)
+        # twist.linear.x = 0.1
+        twist.angular.z = 0.1
+        # cmd_pub.publish(twist)
 
     if 'GO_FAST' in labels:
         rospy.loginfo("→ Moving fast")
-        twist.linear.x = 0.5
-        cmd_pub.publish(twist)
+        # twist.linear.x = 0.5
+        # cmd_pub.publish(twist)
 
     if 'WAVE_RIGHT' in labels:
         rospy.loginfo("→ Waving right arm (stub)")

@@ -308,6 +308,62 @@ DEFAULT_CLASSES = {
     "direction": ["forward", "backward", "left", "right", "turn_left", "turn_right", "none", "unknown"],
 }
 
+
+# # Where you built Fast Downward
+# DOWNWARD_DIR = os.path.realpath(
+#     os.path.join(rospack.get_path('nlp'), '..', 'downward')
+# )
+# # You can override in launch: param name "use_fd_planner"
+# USE_PLANNER_DEFAULT = True
+
+
+# --- Fast Downward path resolution (robust) ---
+def _discover_downward_dir():
+    # 1) ROS param override
+    p = rospy.get_param("~downward_dir", None)
+    if p and os.path.isfile(os.path.join(p, "fast-downward.py")):
+        return os.path.realpath(p)
+
+    # 2) ENV override
+    p = os.environ.get("DOWNWARD_DIR")
+    if p and os.path.isfile(os.path.join(p, "fast-downward.py")):
+        return os.path.realpath(p)
+
+    # 3) Try common locations relative to the nlp package
+    pkg = rospack.get_path('nlp')  # seems to be .../bandit_nlp/src/nlp in your layout
+    candidates = [
+        os.path.join(pkg, "downward"),              # .../src/nlp/downward
+        os.path.join(pkg, "..", "downward"),        # .../src/downward
+        os.path.join(pkg, "..", "..", "downward"),  # .../downward   <-- this is YOUR case
+        os.path.join(pkg, "..", "..", "..", "downward"),
+        os.path.join(os.path.expanduser("~"), "downward"),
+    ]
+    for c in candidates:
+        fdp = os.path.join(c, "fast-downward.py")
+        if os.path.isfile(fdp):
+            return os.path.realpath(c)
+
+    return None
+
+DOWNWARD_DIR = _discover_downward_dir()
+if not DOWNWARD_DIR:
+    rospy.logwarn("[grounding] Could not auto-find Fast Downward. "
+                  "Set param ~downward_dir or env DOWNWARD_DIR.")
+else:
+    rospy.loginfo("[grounding] Using Fast Downward at: %s", DOWNWARD_DIR)
+
+
+
+
+
+
+
+
+
+
+
+
+
 def _load_class_lists(model_dir):
     """
     Load class lists in this priority:
@@ -513,10 +569,25 @@ def main():
                           plan["ordering"], plan["num_steps"], plan["chunks"])
             rospy.loginfo("[grounding] steps=%s", json.dumps(plan["steps"], ensure_ascii=False))
 
-            # 2) PDDL-aligned validation/repair (RULE-BASED, no external planner)
-            repaired_actions, meta = pddl_validate_and_repair(plan, use_planner=False)
-            rospy.loginfo("[pddl] original actions: %s", meta["original"])
-            rospy.loginfo("[pddl] repaired  actions: %s", repaired_actions)
+            # # 2) PDDL-aligned validation/repair (RULE-BASED, no external planner)
+            # repaired_actions, meta = pddl_validate_and_repair(plan, use_planner=False)
+            # rospy.loginfo("[pddl] original actions: %s", meta["original"])
+            # rospy.loginfo("[pddl] repaired  actions: %s", repaired_actions)
+
+            # 2) PDDL validation/repair (Fast Downward + safe fallback)
+            use_planner = rospy.get_param("~use_fd_planner", True)
+            repaired_actions, meta = pddl_validate_and_repair(
+                plan,
+                use_planner=use_planner,
+                downward_dir=DOWNWARD_DIR or ""
+            )
+            rospy.loginfo("[pddl] method=%s rc=%s", meta.get("method"), meta.get("planner_rc"))
+            rospy.loginfo("[pddl] original actions: %s", meta.get("original"))
+            rospy.loginfo("[pddl] final actions:    %s", repaired_actions)
+
+
+
+
 
             # 3) Execute repaired actions (map back to executor slots)
             for i, a in enumerate(repaired_actions, 1):

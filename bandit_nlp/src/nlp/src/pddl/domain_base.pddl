@@ -4,8 +4,11 @@
   ;; ---------- Predicates ----------
   (:predicates
     (stopped)        ;; robot is stopped
-    (did_forward)    ;; has executed move-forward at least once
-    (did_backward)   ;; has executed move-backward at least once
+    (did_forward)    ;; executed move-forward
+    (did_backward)   ;; executed move-backward
+    (did_turn_left)  ;; executed turn-left
+    (did_turn_right) ;; executed turn-right
+    (did_spin)       ;; executed spin
   )
 
   ;; ---------- Actions ----------
@@ -22,6 +25,30 @@
     :effect (and
       (not (stopped))
       (did_backward)
+    )
+  )
+
+  (:action turn-left
+    :precondition (stopped)
+    :effect (and
+      (not (stopped))
+      (did_turn_left)
+    )
+  )
+
+  (:action turn-right
+    :precondition (stopped)
+    :effect (and
+      (not (stopped))
+      (did_turn_right)
+    )
+  )
+
+  (:action spin
+    :precondition (stopped)
+    :effect (and
+      (not (stopped))
+      (did_spin)
     )
   )
 

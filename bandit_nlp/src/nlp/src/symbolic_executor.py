@@ -1,5 +1,5 @@
 # symbolic_executor.py
-# Executor aligned to base_actions_ext domain (no wave; includes spin).
+
 # Adds CSV logging while keeping DRY-RUN printing.
 
 import os, time, csv
@@ -12,6 +12,7 @@ MOVE_DURATION_DEFAULT  = 1.5
 TURN_DURATION_DEFAULT  = 1.0
 SPIN_DURATION_DEFAULT  = 1.0
 SEQ_PAUSE_DEFAULT      = 0.10
+WAVE_DURATION_DEFAULT = 1.2
 
 LIN_X_DEFAULTS = {"slow": 0.12, "normal": 0.22, "fast": 0.32}
 ANG_Z_DEFAULTS = {"slow": 0.35, "normal": 0.55, "fast": 0.75}
@@ -30,6 +31,7 @@ _move_dur   = MOVE_DURATION_DEFAULT
 _turn_dur   = TURN_DURATION_DEFAULT
 _spin_dur   = SPIN_DURATION_DEFAULT
 _seq_pause  = SEQ_PAUSE_DEFAULT
+_wave_dur = WAVE_DURATION_DEFAULT
 
 _lin_map = LIN_X_DEFAULTS.copy()
 _ang_map = ANG_Z_DEFAULTS.copy()
@@ -65,6 +67,7 @@ def _load_params():
     _move_dur   = float(_param("move_duration", MOVE_DURATION_DEFAULT))
     _turn_dur   = float(_param("turn_duration", TURN_DURATION_DEFAULT))
     _spin_dur   = float(_param("spin_duration", SPIN_DURATION_DEFAULT))
+    _wave_dur = float(_param("wave_duration", WAVE_DURATION_DEFAULT))
     _seq_pause  = float(_param("seq_pause", SEQ_PAUSE_DEFAULT))
     _dry_run    = bool(_param("dry_run", True))  # default: desktop DRY-RUN
     _log_csv    = bool(_param("log_csv", True))
@@ -148,6 +151,7 @@ def execute_symbolic(slots: dict):
     direction  = str(slots.get("direction", "unknown"))
     speed_slot = str(slots.get("speed", "unknown"))
     correction = bool(slots.get("correction", False))
+    hand       = (str(slots.get("hand", "none")) or "none").lower()
 
     pretty = f"{intent}:{direction} speed={speed_slot} corr={correction}"
     print(f"[EXEC] {pretty}")
@@ -171,11 +175,30 @@ def execute_symbolic(slots: dict):
         label = "STOP"
         _run_phase(_seq_pause, Twist(), label, intent, direction, speed_slot)
         return
+    
+        # ---- WAVE (handle BEFORE move-only check) ----
+    if intent == "wave":
+        # choose a default hand if none
+        if hand in ("none", "unknown", ""):
+            hand = "right"
+        label = f"WAVE ({hand})"
+        # DRY-RUN: sleep & log; Real robot: replace with arm/head motion
+        _run_phase(_wave_dur, Twist(), label, intent, hand, speed_slot)
+        return
+    
 
     if intent != "move":
         rospy.logwarn("[executor] unsupported intent=%s", intent)
         _log_row("ACTION_SKIP", intent, direction, speed_slot, "", 0, "unsupported_intent")
         return
+    
+    # if intent == "wave":
+    #     # DRY-RUN: just sleep & log; Real robot: replace with arm/head motion
+    #     label = f"WAVE ({direction or 'none'})"
+    #     _run_phase(_wave_dur, Twist(), label, intent, direction, speed_slot)
+    #     return
+
+        
 
     if direction == "forward":
         cmd.linear.x = lin_mag; dur = _move_dur; label = f"MOVE FORWARD (vx={cmd.linear.x:.2f})"
@@ -193,3 +216,6 @@ def execute_symbolic(slots: dict):
         return
 
     _run_phase(dur, cmd, label, intent, direction, speed_slot)
+
+
+

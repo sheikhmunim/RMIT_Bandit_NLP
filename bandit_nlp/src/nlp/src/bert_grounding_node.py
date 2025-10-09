@@ -11,7 +11,7 @@ from transformers import BertTokenizer
 from multi_head_model import MultiHeadBERT
 from symbolic_executor import execute_symbolic, init_executor
 from grounding_planner import GroundingPlanner
-from pddl_integration import pddl_validate_and_repair, action_to_slots  # <-- NEW
+from pddl_integration import action_to_slots, pddl_validate_and_repair # <-- NEW
 
 # trial_logger.py
 import csv, os, time
@@ -301,6 +301,142 @@ def _estimate_path_m(repaired_actions):
 # ---------------------------
 # MAIN NODE WITH PLANNER + PDDL REPAIR
 # ---------------------------
+# def main():
+#     rospy.init_node("bert_grounding_node")
+#     init_executor()
+
+#     tokenizer, model, device, C = load_model()
+#     rospy.loginfo("BERT grounding node ready. Type natural language commands.")
+
+#     # ---- wrappers used by GroundingPlanner ----
+#     def predict_fn_chunk(chunk_text: str) -> dict:
+#         # per-chunk classification using the same model
+#         return predict_command(chunk_text, tokenizer, model, device, C, verbose=False)
+
+#     def order_predict_fn_full(full_text: str) -> dict:
+#         # full-text; we'll read 'ordering' from this result
+#         return predict_command(full_text, tokenizer, model, device, C, verbose=False)
+
+#     planner = GroundingPlanner(
+#         predict_fn=predict_fn_chunk,
+#         order_predict_fn=order_predict_fn_full,  # uses the ordering head on full text
+#         normalize_lr_to_turn=True,
+#         map_unknown_speed_to="normal",
+#         map_unknown_direction_to="forward",
+#         fallback_ordering="sequential",
+#     )
+
+#     while not rospy.is_shutdown():
+#         try:
+#             cmd = input(">>> ").strip()
+#             if not cmd:
+#                 continue
+
+#             # 1) NLP plan: split → classify per chunk → ordering from full text (then rule-resolved inside planner)
+#             t_nlp0 = time.time()
+#             plan = planner.predict_steps(cmd)
+#             t_nlp_ms = (time.time() - t_nlp0) * 1000.0
+
+#             rospy.loginfo("[grounding] ordering=%s, num_steps=%d, chunks=%s",
+#                           plan["ordering"], plan["num_steps"], plan["chunks"])
+#             rospy.loginfo("[grounding] steps=%s", json.dumps(plan["steps"], ensure_ascii=False))
+
+#             # # 2) PDDL-aligned validation/repair (RULE-BASED, no external planner)
+#             # repaired_actions, meta = pddl_validate_and_repair(plan, use_planner=False)
+#             # rospy.loginfo("[pddl] original actions: %s", meta["original"])
+#             # rospy.loginfo("[pddl] repaired  actions: %s", repaired_actions)
+
+#             # 2) PDDL validation/repair (Fast Downward + safe fallback)
+#             use_planner = rospy.get_param("~use_fd_planner", True)
+#             t_plan0 = time.time()
+#             repaired_actions, meta = pddl_validate_and_repair(
+#                 plan,
+#                 use_planner=use_planner,
+#                 downward_dir=DOWNWARD_DIR or ""
+#             )
+#             t_plan_ms = (time.time() - t_plan0) * 1000.0
+#             rospy.loginfo("[pddl] method=%s rc=%s", meta.get("method"), meta.get("planner_rc"))
+#             rospy.loginfo("[pddl] original actions: %s", meta.get("original"))
+#             rospy.loginfo("[pddl] final actions:    %s", repaired_actions)
+
+#             # ---------- begin TRIAL ----------
+#             global _next_trial_id
+#             scenario = _tag_scenario(cmd, plan, repaired_actions)
+#             # you’re typing text -> ASR not used here
+#             tlog.begin(
+#                 trial_id=_next_trial_id,
+#                 scenario=scenario,
+#                 asr_ms=0.0,
+#                 nlp_ms=t_nlp_ms,
+#                 plan_ms=t_plan_ms
+#             )
+#             _next_trial_id += 1
+
+#             # count repairs if meta provides signals
+#             try:
+#                 # examples: meta might include diffs or flags; if not, fallback to len diff
+#                 orig = meta.get("original") or []
+#                 rep  = repaired_actions or []
+#                 if isinstance(orig, list) and isinstance(rep, list) and len(rep) != len(orig):
+#                     tlog.add_replan(1)
+#                 if meta.get("repaired", False):
+#                     tlog.add_replan(1)
+#             except Exception:
+#                 pass
+
+
+
+
+
+#             # 3) Execute repaired actions (map back to executor slots)
+#             t_exec0 = time.time()
+
+#             for i, a in enumerate(repaired_actions, 1):
+#                 slots = action_to_slots(a, default_speed="normal")
+#                 # Add helpful runtime context
+#                 slots.update({
+#                     "ordering": "sequential",      # repaired actions are linearized
+#                     "correction": False,
+#                     "correction_score": 0.0,
+#                     "step_index": i,
+#                     "num_steps": len(repaired_actions),
+#                 })
+#                 rospy.loginfo("[grounding] Exec (repaired) %d/%d: %s", i, len(repaired_actions), slots)
+#                 execute_symbolic(slots)
+#                 if slots.get("intent") == "move" and slots.get("direction") in ("forward", "backward"):
+#                     spd = (slots.get("speed") or "normal").lower()
+#                 if spd not in LIN_X:
+#                     spd = "normal"
+#                 try:
+#                     tlog.add_path(LIN_X[spd] * MOVE_DUR)
+#                 except Exception as _e:
+#                     rospy.logwarn("[grounding] path log skipped: %s", _e)
+
+#             # ---------- end TRIAL ----------
+#             tlog.end(success=True)
+
+
+#         except (KeyboardInterrupt, EOFError):
+#             print("\nExiting...")
+#             break
+#         except Exception as e:
+#             rospy.logerr(f"Error during prediction: {e}", exc_info=True)
+#                         # record failed trial if we had started one
+#             try:
+#                 tlog.end(success=False, err_tag=f"exception:{type(e).__name__}")
+#             except Exception:
+#                 pass
+
+# if __name__ == "__main__":
+#     # ensure local imports work if run directly
+#     sys.path.insert(0, os.getcwd())
+#     main()
+
+
+
+
+
+
 def main():
     rospy.init_node("bert_grounding_node")
     init_executor()
@@ -310,21 +446,25 @@ def main():
 
     # ---- wrappers used by GroundingPlanner ----
     def predict_fn_chunk(chunk_text: str) -> dict:
-        # per-chunk classification using the same model
         return predict_command(chunk_text, tokenizer, model, device, C, verbose=False)
 
     def order_predict_fn_full(full_text: str) -> dict:
-        # full-text; we'll read 'ordering' from this result
         return predict_command(full_text, tokenizer, model, device, C, verbose=False)
 
     planner = GroundingPlanner(
         predict_fn=predict_fn_chunk,
-        order_predict_fn=order_predict_fn_full,  # uses the ordering head on full text
+        order_predict_fn=order_predict_fn_full,
         normalize_lr_to_turn=True,
         map_unknown_speed_to="normal",
         map_unknown_direction_to="forward",
         fallback_ordering="sequential",
     )
+
+    # helper for normalizing list/scalar fields
+    def _norm1(v, default=""):
+        if isinstance(v, (list, tuple)):
+            v = v[0] if v else default
+        return (str(v) if v is not None else default).lower()
 
     while not rospy.is_shutdown():
         try:
@@ -332,7 +472,7 @@ def main():
             if not cmd:
                 continue
 
-            # 1) NLP plan: split → classify per chunk → ordering from full text (then rule-resolved inside planner)
+            # 1) NLP plan
             t_nlp0 = time.time()
             plan = planner.predict_steps(cmd)
             t_nlp_ms = (time.time() - t_nlp0) * 1000.0
@@ -341,12 +481,7 @@ def main():
                           plan["ordering"], plan["num_steps"], plan["chunks"])
             rospy.loginfo("[grounding] steps=%s", json.dumps(plan["steps"], ensure_ascii=False))
 
-            # # 2) PDDL-aligned validation/repair (RULE-BASED, no external planner)
-            # repaired_actions, meta = pddl_validate_and_repair(plan, use_planner=False)
-            # rospy.loginfo("[pddl] original actions: %s", meta["original"])
-            # rospy.loginfo("[pddl] repaired  actions: %s", repaired_actions)
-
-            # 2) PDDL validation/repair (Fast Downward + safe fallback)
+            # 2) PDDL validation/repair (FD + safe fallback + speed-chain short-circuit)
             use_planner = rospy.get_param("~use_fd_planner", True)
             t_plan0 = time.time()
             repaired_actions, meta = pddl_validate_and_repair(
@@ -355,14 +490,15 @@ def main():
                 downward_dir=DOWNWARD_DIR or ""
             )
             t_plan_ms = (time.time() - t_plan0) * 1000.0
+
             rospy.loginfo("[pddl] method=%s rc=%s", meta.get("method"), meta.get("planner_rc"))
             rospy.loginfo("[pddl] original actions: %s", meta.get("original"))
             rospy.loginfo("[pddl] final actions:    %s", repaired_actions)
+            rospy.loginfo("[pddl] executing source=%s", meta.get("method", "unknown"))
 
             # ---------- begin TRIAL ----------
             global _next_trial_id
             scenario = _tag_scenario(cmd, plan, repaired_actions)
-            # you’re typing text -> ASR not used here
             tlog.begin(
                 trial_id=_next_trial_id,
                 scenario=scenario,
@@ -372,9 +508,8 @@ def main():
             )
             _next_trial_id += 1
 
-            # count repairs if meta provides signals
+            # count repairs
             try:
-                # examples: meta might include diffs or flags; if not, fallback to len diff
                 orig = meta.get("original") or []
                 rep  = repaired_actions or []
                 if isinstance(orig, list) and isinstance(rep, list) and len(rep) != len(orig):
@@ -384,47 +519,58 @@ def main():
             except Exception:
                 pass
 
-
-
-
-
-            # 3) Execute repaired actions (map back to executor slots)
+            # 3) Execute repaired actions (rehydrate original speeds)
             t_exec0 = time.time()
+
+            # bring original classified MOVE steps to copy speeds back in order
+            src_move_steps = [s for s in plan["steps"] if _norm1(s.get("intent")) == "move"]
+            move_i = 0
 
             for i, a in enumerate(repaired_actions, 1):
                 slots = action_to_slots(a, default_speed="normal")
-                # Add helpful runtime context
+                # runtime context
                 slots.update({
-                    "ordering": "sequential",      # repaired actions are linearized
+                    "ordering": "sequential",
                     "correction": False,
                     "correction_score": 0.0,
                     "step_index": i,
                     "num_steps": len(repaired_actions),
                 })
+
+                # rehydrate speeds for translational moves
+                if a in ("move-forward", "move-backward") and move_i < len(src_move_steps):
+                    s_speed = _norm1(src_move_steps[move_i].get("speed"), "normal")
+                    slots["speed"] = s_speed
+                    move_i += 1
+                elif a == "stop":
+                    slots["speed"] = "none"  # tidy logs
+
                 rospy.loginfo("[grounding] Exec (repaired) %d/%d: %s", i, len(repaired_actions), slots)
                 execute_symbolic(slots)
+
+                # log linear path only for forward/backward moves
                 if slots.get("intent") == "move" and slots.get("direction") in ("forward", "backward"):
-                    spd = (slots.get("speed") or "normal").lower()
-                if spd not in LIN_X:
-                    spd = "normal"
-                tlog.add_path(LIN_X[spd] * MOVE_DUR)
+                    spd = _norm1(slots.get("speed"), "normal")
+                    if spd not in LIN_X:
+                        spd = "normal"
+                    try:
+                        tlog.add_path(LIN_X[spd] * MOVE_DUR)
+                    except Exception as _e:
+                        rospy.logwarn("[grounding] path log skipped: %s", _e)
 
             # ---------- end TRIAL ----------
             tlog.end(success=True)
-
 
         except (KeyboardInterrupt, EOFError):
             print("\nExiting...")
             break
         except Exception as e:
             rospy.logerr(f"Error during prediction: {e}", exc_info=True)
-                        # record failed trial if we had started one
             try:
                 tlog.end(success=False, err_tag=f"exception:{type(e).__name__}")
             except Exception:
                 pass
 
 if __name__ == "__main__":
-    # ensure local imports work if run directly
     sys.path.insert(0, os.getcwd())
     main()

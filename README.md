@@ -140,7 +140,7 @@ Look for:
 
 ### 6. Run a Motion Test
 
-    rosrun bandit_nlp cmd_vel_publish.py
+    rosrun nlp cmd_vel_publish.py
 
 If TIAGo moves → connection successful.
 
@@ -150,7 +150,7 @@ If TIAGo moves → connection successful.
 
 Start the hybrid controller:
 
-    rosrun bandit_nlp bert_grounding_node.py
+    rosrun nlp bert_grounding_node.py
 
 Now speak or type commands:
 
